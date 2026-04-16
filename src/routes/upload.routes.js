@@ -4,6 +4,8 @@ import {
   completeUpload,
   initMultipartUpload,
   completeMultipartUpload,
+  initUploadAuto,
+  completeUploadAuto,
 } from "../controllers/upload.controller.js";
 
 const router = express.Router();
@@ -263,8 +265,146 @@ router.post("/init-multipart", initMultipartUpload);
 router.post("/complete-multipart", completeMultipartUpload);
 
 /**
+ * @swagger
+ * /api/upload/init-auto:
  *   post:
- *     summary: Direct file upload (for Swagger testing only)
+ *     summary: Initialize upload (auto-detect simple vs multipart)
+ *     tags: [Upload]
+ *     description: |
+ *       ⭐ RECOMMENDED - Automatically choose upload method based on file size.
+ *
+ *       - Files ≤ 5MB → Simple upload flow
+ *       - Files > 5MB → Multipart upload flow
+ *
+ *       Flow:
+ *       1. Call this API with fileName, fileSize, mimeType
+ *       2. Use returned signedUrl to upload (PUT request)
+ *       3. Call /complete-auto to finalize
+ *
+ *       Supported file types:
+ *       - Images: PNG, JPEG, WebP
+ *       - Videos: MP4, WebM, MOV, AVI
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - fileName
+ *               - fileSize
+ *               - mimeType
+ *             properties:
+ *               fileName:
+ *                 type: string
+ *                 example: video.mp4
+ *               fileSize:
+ *                 type: number
+ *                 description: File size in bytes
+ *                 example: 41943040
+ *               mimeType:
+ *                 type: string
+ *                 example: video/mp4
+ *     responses:
+ *       200:
+ *         description: Upload initialized (simple or multipart)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: success
+ *                 message:
+ *                   type: string
+ *                   example: Upload initialized (multipart)
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     uploadId:
+ *                       type: string
+ *                     filePath:
+ *                       type: string
+ *                     signedUrl:
+ *                       type: string
+ *                     token:
+ *                       type: string
+ *                     uploadMethod:
+ *                       type: string
+ *                       example: multipart
+ *                       enum: [simple, multipart]
+ *                     autoDetected:
+ *                       type: boolean
+ *                       example: true
+ *       400:
+ *         description: Invalid parameters
+ */
+router.post("/init-auto", initUploadAuto);
+
+/**
+ * @swagger
+ * /api/upload/complete-auto:
+ *   post:
+ *     summary: Complete upload (auto-detect simple vs multipart)
+ *     tags: [Upload]
+ *     description: |
+ *       ⭐ RECOMMENDED - Automatically finalize upload.
+ *
+ *       Automatically determines if file was uploaded via simple or multipart,
+ *       verifies existence, validates type/size, and returns public URL.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - uploadId
+ *               - filePath
+ *             properties:
+ *               uploadId:
+ *                 type: string
+ *               filePath:
+ *                 type: string
+ *               fileSize:
+ *                 type: number
+ *                 description: Optional, used for auto-detection
+ *               mimeType:
+ *                 type: string
+ *               uploadMethod:
+ *                 type: string
+ *                 enum: [simple, multipart]
+ *                 description: Optional, if known
+ *     responses:
+ *       200:
+ *         description: Upload completed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: success
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     publicUrl:
+ *                       type: string
+ *                     size:
+ *                       type: number
+ *                     mimeType:
+ *                       type: string
+ *                     uploadMethod:
+ *                       type: string
+ *                       enum: [simple, multipart]
+ *       400:
+ *         description: Validation or upload failure
+ */
+router.post("/complete-auto", completeUploadAuto);
+
+/**
  *     tags: [Upload]
  *     description: |
  *       ⚠️ This endpoint is ONLY for Swagger testing.

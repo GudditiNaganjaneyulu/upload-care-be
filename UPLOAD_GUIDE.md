@@ -2,7 +2,28 @@
 
 ## Overview
 
-This upload service now supports both simple uploads (up to 5MB for images) and multipart uploads (up to 500MB for images and videos).
+This upload service now supports **automatic file size detection** for seamless uploads:
+- **Automatic routing** - Uploads ≤5MB use simple flow, larger files use multipart
+- **Simple uploads** - Up to 5MB for images (PNG, JPEG, WebP)
+- **Multipart uploads** - Up to 500MB for images and videos
+
+---
+
+## 🎯 Recommended: Auto-Detection Flow
+
+Simply provide file metadata and the system automatically chooses the best approach:
+
+```
+POST /api/upload/init-auto (detects size)
+  ↓
+Automatic routing: simple or multipart?
+  ↓
+PUT to signedUrl with file
+  ↓
+POST /api/upload/complete-auto (auto-finalizes)
+```
+
+**This is the simplest approach - recommended for all cases.**
 
 ---
 
@@ -32,6 +53,67 @@ This upload service now supports both simple uploads (up to 5MB for images) and 
 ---
 
 ## Upload Flows
+
+### ⭐ Flow 0: AUTO-DETECT (Recommended)
+
+**Automatically routes to simple or multipart based on file size.**
+
+```bash
+# Step 1: Initialize (auto-detection happens here)
+curl -X POST http://localhost:3000/api/upload/init-auto \
+  -H "Content-Type: application/json" \
+  -d '{
+    "fileName": "myvideo.mp4",
+    "fileSize": 41943040,
+    "mimeType": "video/mp4"
+  }'
+
+# Response:
+{
+  "status": "success",
+  "message": "Upload initialized (multipart)",
+  "data": {
+    "uploadId": "uuid-456",
+    "filePath": "uuid-456-myvideo.mp4",
+    "signedUrl": "https://...",
+    "token": "...",
+    "uploadMethod": "multipart",  # ← Auto-detected!
+    "autoDetected": true,
+    "fileSizeThreshold": 5242880
+  }
+}
+
+# Step 2: Upload file (same for both methods)
+curl -X PUT https://... \
+  -H "Authorization: Bearer token" \
+  --data-binary @myvideo.mp4
+
+# Step 3: Complete (auto-detection happens here too)
+curl -X POST http://localhost:3000/api/upload/complete-auto \
+  -H "Content-Type: application/json" \
+  -d '{
+    "uploadId": "uuid-456",
+    "filePath": "uuid-456-myvideo.mp4",
+    "fileSize": 41943040,
+    "mimeType": "video/mp4"
+  }'
+
+# Response:
+{
+  "status": "success",
+  "message": "Upload completed",
+  "data": {
+    "publicUrl": "https://...",
+    "size": 41943040,
+    "mimeType": "video/mp4",
+    "uploadMethod": "multipart",
+    "autoDetected": true,
+    "status": "uploaded"
+  }
+}
+```
+
+---
 
 ### Flow 1: Simple Upload (≤ 5MB images)
 
@@ -165,7 +247,50 @@ curl -X POST http://localhost:3000/api/upload/complete-multipart \
 
 ## Client-Side Implementation
 
-### Recommended approach in Frontend:
+### ⭐ RECOMMENDED: Auto-Detection (Simplest)
+
+```javascript
+// Just send file metadata, backend auto-detects and handles everything
+const uploadFile = async (file) => {
+  const fileName = file.name;
+  const fileSize = file.size;
+  const mimeType = file.type;
+
+  // Step 1: Initialize (auto-detects size and chooses method)
+  const initRes = await fetch('http://localhost:3000/api/upload/init-auto', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fileName, fileSize, mimeType })
+  });
+
+  const { data } = await initRes.json();
+  const { uploadId, filePath, signedUrl, token, uploadMethod } = data;
+  
+  console.log(`File will be uploaded via: ${uploadMethod}`);
+
+  // Step 2: Upload file (works for both simple and multipart)
+  const uploadRes = await fetch(signedUrl, {
+    method: 'PUT',
+    headers: { 'Authorization': `Bearer ${token}` },
+    body: file
+  });
+
+  if (!uploadRes.ok) throw new Error('Upload failed');
+
+  // Step 3: Complete (auto-detects and finalizes)
+  const completeRes = await fetch('http://localhost:3000/api/upload/complete-auto', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ uploadId, filePath, fileSize, mimeType })
+  });
+
+  const result = await completeRes.json();
+  console.log('Upload complete:', result.data.publicUrl);
+  return result;
+};
+```
+
+### MANUAL: Explicit Control (if preferred)
 
 ```javascript
 const uploadFile = async (file) => {
