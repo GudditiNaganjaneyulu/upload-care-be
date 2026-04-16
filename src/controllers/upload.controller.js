@@ -6,7 +6,7 @@ import {
 // ✅ INIT UPLOAD
 export const initUpload = async (req, res) => {
   try {
-    const { fileName } = req.body;
+    const fileName = req.body?.fileName;
 
     if (!fileName) {
       return res.status(400).json({
@@ -35,7 +35,8 @@ export const initUpload = async (req, res) => {
 // ✅ COMPLETE UPLOAD
 export const completeUpload = async (req, res) => {
   try {
-    const { uploadId, filePath } = req.body;
+    const uploadId = req.body?.uploadId;
+    const filePath = req.body?.filePath;
 
     if (!uploadId || !filePath) {
       return res.status(400).json({
