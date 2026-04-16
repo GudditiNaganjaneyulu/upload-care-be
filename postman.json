@@ -8,7 +8,7 @@
   "variable": [
     {
       "key": "baseUrl",
-      "value": "http://localhost:5000"
+      "value": "https://upload-care.onrender.com"
     },
     {
       "key": "uploadId",
@@ -36,7 +36,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{}"
+          "raw": "{\"fileName\": \"example.png\"}"
         },
         "url": {
           "raw": "{{baseUrl}}/api/upload/init",
